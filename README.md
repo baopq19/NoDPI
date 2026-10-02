@@ -9,6 +9,17 @@ It handles DPI connected using optical splitter or port mirroring (**Passive DPI
 
 # Quick start
 
+For this fork's Windows build, extract the [combined Windows package](release/NoDPI-windows-2026-10-02.zip),
+close any other GoodbyeDPI/NoDPI process, and run `start_NoDPI.cmd` as
+Administrator. Keep its window open while using NoDPI. This profile uses `-8`,
+redirects UDP DNS to Google DNS, and limits HTTP/TLS tricks to the domains in
+`hosts.txt`. Edit that file to change the affected sites; one parent domain per
+line also matches its subdomains. The profile was tested with Steam, Rust's
+in-game store and server list, and browser video playback on one connection.
+Other networks may need different settings.
+
+Upstream GoodbyeDPI releases also provide these presets:
+
 * **For Russia**: Download [latest version from Releases page](https://github.com/ValdikSS/GoodbyeDPI/releases), unpack the file and run **1_russia_blacklist_dnsredir.cmd** script.
 * For other countries: Download [latest version from Releases page](https://github.com/ValdikSS/GoodbyeDPI/releases), unpack the file and run **2_any_country_dnsredir.cmd**.
 
@@ -111,6 +122,58 @@ If your provider intercepts DNS requests, you may want to use `--dns-addr` optio
 
 Check the .cmd scripts and modify it according to your preference and network conditions.
 
+### When a site stops opening
+
+Mode `-9` does not use a site list. It applies its HTTP/TLS techniques to
+outbound TCP traffic on ports 80 and 443, drops supported QUIC Initial packets
+on UDP port 443, and, when DNS redirect options are supplied, rewrites UDP DNS
+traffic on port 53. `--blacklist` is optional and narrows the HTTP/TLS handling
+to named hosts. A page or in-game store can use several hostnames and network
+paths; one successful page load does not prove every request succeeded.
+
+The release scripts are separate from this source checkout. Check the script's
+`goodbyedpi.exe` command line and the program window first: it must report
+`Filter activated, GoodbyeDPI is now running!`. A source change has no effect
+until the executable in the release directory is rebuilt and replaced.
+
+For a site such as `store.steampowered.com`, try these checks with GoodbyeDPI
+running and stopped, saving the output and the browser's exact error message:
+
+```powershell
+Resolve-DnsName store.steampowered.com -Type A -NoHostsFile
+Resolve-DnsName store.steampowered.com -Type A -Server 1.1.1.1 -NoHostsFile
+curl.exe -4 -I --http1.1 https://store.steampowered.com/
+curl.exe -6 -I --http1.1 https://store.steampowered.com/
+```
+
+If the normal DNS answer is `127.0.0.1` while the public resolver returns a
+public address, fix the DNS path first. Repeat the lookup with the script
+running; a loopback answer then means its DNS redirection did not resolve the
+problem. A browser using Secure DNS can also bypass the script's UDP DNS
+redirection.
+
+`http://` may redirect to HTTPS, so test HTTPS directly. The `-4` and `-6`
+results distinguish an IPv4 problem from an IPv6 problem. `curl.exe` uses TCP,
+which also helps distinguish TCP trouble from a browser's QUIC/HTTP3 path.
+If the browser fails while `curl.exe` works, its DNS or QUIC path may differ
+from curl's TCP path. Mode `-9` adds `-q`, which drops QUIC Initial packets and
+can make browsers fall back to TCP, but broad QUIC blocking disrupted video
+playback in the reported setup. This source handles QUIC v1 and v2 Initial
+packets; older executables only handle v1. Close the previous GoodbyeDPI
+instance before switching modes.
+
+If the script has `--dns-addr`/`--dnsv6-addr`, compare once with those options
+removed and Secure DNS enabled in the browser. This isolates a DNS redirect or
+resolver failure from packet handling. A different preset or DNS resolver may
+be needed for a particular ISP; no preset works on every network.
+
+The packaged `start_NoDPI.cmd` keeps Google DNS redirection and applies TCP
+tricks only to the domains in `hosts.txt`. If Steam Store fails intermittently,
+run `diagnose_steam.cmd` once during the failure and again after recovery. It
+saves DNS answers and IPv4/IPv6 TCP checks in `steam-connectivity.log` beside
+the script. Keep the browser's exact error message too. A resolver or CDN
+address can change without a source-code change.
+
 # How does it work
 
 ### Passive DPI
@@ -129,7 +192,10 @@ Active DPI is more tricky to fool. Currently the software uses 7 methods to circ
 * Mixing case of Host header value
 * Sending fake HTTP/HTTPS packets with low Time-To-Live value, incorrect checksum or incorrect TCP Sequence/Acknowledgement numbers to fool DPI and prevent delivering them to the destination
 
-These methods should not break any website as they're fully compatible with TCP and HTTP standards, yet it's sufficient to prevent DPI data classification and to circumvent censorship. Additional space may break some websites, although it's acceptable by HTTP/1.1 specification (see 19.3 Tolerant Applications).
+These methods can interfere with some applications and websites. The packaged
+profile uses a host list to limit where the HTTP/TLS tricks are applied.
+Additional space may break some websites, although it is allowed by HTTP/1.1
+specification (see 19.3 Tolerant Applications).
 
 The program loads WinDivert driver which uses Windows Filtering Platform to set filters and redirect packets to the userspace. It's running as long as console window is visible and terminates when you close the window.
 
@@ -143,7 +209,7 @@ To build x86 exe run:
 
 And for x86_64:
 
-`make CPREFIX=x86_64-w64-mingw32- BIT64=1 WINDIVERTHEADERS=/path/to/windivert/include WINDIVERTLIBS=/path/to/windivert/amd64`
+`make CPREFIX=x86_64-w64-mingw32- BIT64=1 WINDIVERTHEADERS=/path/to/windivert/include WINDIVERTLIBS=/path/to/windivert/x64`
 
 # How to install as Windows Service
 

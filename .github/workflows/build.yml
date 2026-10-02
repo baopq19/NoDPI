@@ -4,9 +4,17 @@ on:
   push:
     paths:
       - 'src/**'
+      - 'start_NoDPI.cmd'
+      - 'hosts.txt'
+      - 'diagnose_steam.cmd'
+      - '.github/workflows/build.yml'
   pull_request:
     paths:
       - 'src/**'
+      - 'start_NoDPI.cmd'
+      - 'hosts.txt'
+      - 'diagnose_steam.cmd'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
 
 env:
@@ -79,3 +87,18 @@ jobs:
         with:
           name: goodbyedpi_x86_${{ steps.vars.outputs.sha_short }}
           path: goodbyedpi_x86_${{ steps.vars.outputs.sha_short }}
+
+      - name: Prepare combined Windows package
+        run: |
+          mkdir -p NoDPI-windows/x86_64 NoDPI-windows/x86
+          cp goodbyedpi_x86_64_${{ steps.vars.outputs.sha_short }}/* NoDPI-windows/x86_64/
+          cp goodbyedpi_x86_${{ steps.vars.outputs.sha_short }}/* NoDPI-windows/x86/
+          cp start_NoDPI.cmd hosts.txt diagnose_steam.cmd README.md LICENSE NoDPI-windows/
+          cp "${WINDIVERT_BASENAME}/LICENSE" NoDPI-windows/WinDivert-LICENSE.txt
+          (cd NoDPI-windows && find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt)
+
+      - name: Upload combined Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: NoDPI-windows_${{ steps.vars.outputs.sha_short }}
+          path: NoDPI-windows

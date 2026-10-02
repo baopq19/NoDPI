@@ -79,9 +79,14 @@ WINSOCK_API_LINKAGE INT WSAAPI inet_pton(INT Family, LPCSTR pStringBuf, PVOID pA
          "(tcp.DstPort == 80 or tcp.DstPort == 443) and tcp.Ack and " \
          "(" DIVERT_NO_LOCALNETSv4_DST " or " DIVERT_NO_LOCALNETSv6_DST "))" \
         "))"
+/* QUIC v1 and v2 use different version numbers and Initial packet type bits.
+ * Dropping Initial packets can make clients fall back to TCP/TLS. */
 #define FILTER_PASSIVE_BLOCK_QUIC "outbound and !impostor and !loopback and udp " \
         "and udp.DstPort == 443 and udp.PayloadLength >= 1200 " \
-        "and udp.Payload[0] >= 0xC0 and udp.Payload32[1b] == 0x01"
+        "and ((udp.Payload[0] >= 0xC0 and udp.Payload[0] < 0xD0 " \
+        "and udp.Payload32[1b] == 0x00000001) or " \
+        "(udp.Payload[0] >= 0xD0 and udp.Payload[0] < 0xE0 " \
+        "and udp.Payload32[1b] == 0x6B3343CF))"
 #define FILTER_PASSIVE_STRING_TEMPLATE "inbound and ip and tcp and " \
         "!impostor and !loopback and " \
         "(true " IPID_TEMPLATE ") and " \

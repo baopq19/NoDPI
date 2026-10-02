@@ -1,2 +1,7 @@
 *.o
 *.exe
+/dist/
+/steam-connectivity.log
+/test_*.cmd
+/test_focused_hosts.txt
+/2_any_country_google_dnsredir.cmd
